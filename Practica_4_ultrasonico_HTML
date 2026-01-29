@@ -1,0 +1,51 @@
+#include <WiFi.h>
+#include <ThingerESP32.h>
+
+/* ===== THINGER.IO ===== */
+#define USERNAME "Carlinhox_23"
+#define DEVICE_ID "carlinhox_23"
+#define DEVICE_CREDENTIAL "1234567"
+
+/* ===== WIFI ===== */
+#define SSID "_HIRALDA_"
+#define SSID_PASSWORD "**2004##25__"
+
+#define TRIG_PIN 5
+#define ECHO_PIN 18
+
+ThingerESP32 thing(USERNAME, DEVICE_ID, DEVICE_CREDENTIAL);
+
+float distancia = 0;
+
+float medirDistancia() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duracion = pulseIn(ECHO_PIN, HIGH, 30000); // 30ms timeout
+
+  if (duracion == 0) return -1; // fuera de rango
+
+  float dist = duracion * 0.034 / 2;
+  return dist;
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  thing.add_wifi(SSID, SSID_PASSWORD);
+
+  // Recurso que usa el HTML
+  thing["distance"] >> outputValue(distancia);
+}
+
+void loop() {
+  distancia = medirDistancia();
+  thing.handle();
+  delay(500);
+}

@@ -1,0 +1,35 @@
+#include <WiFi.h>
+#include <ThingerESP32.h>
+
+/* ========= THINGER.IO ========= */
+#define USERNAME          "Carlinhox_23"
+#define DEVICE_ID         "carlinhox_23"
+#define DEVICE_CREDENTIAL "123456"
+
+/* ========= WIFI ========= */
+#define SSID              "_HIRALDA_"
+#define SSID_PASSWORD     "**2004##25__I"
+
+/* ========= LED ========= */
+#define LED_PIN 2
+
+ThingerESP32 thing(USERNAME, DEVICE_ID, DEVICE_CREDENTIAL);
+
+void setup() {
+    Serial.begin(115200);
+    delay(1000);
+    
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+    
+    thing.add_wifi(SSID, SSID_PASSWORD);
+    
+    // LED control resource via Thinger
+    thing["led"] << digitalPin(LED_PIN);
+    
+    Serial.println("ESP32 iniciado. Revisa Thinger.io (ONLINE).");
+}
+
+void loop() {
+    thing.handle();
+}
