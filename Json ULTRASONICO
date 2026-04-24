@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IoT Ultrasonic Dashboard</title>
+  <style>
+    :root {
+      --primary: #00f2fe;
+      --secondary: #4facfe;
+      --bg: #0b0e14;
+      --card-bg: rgba(30, 41, 59, 0.7);
+    }
+
+    body {
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(circle at top right, #1e293b, #0b0e14);
+      color: white;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      position: relative;
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 3rem;
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      width: 320px;
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+
+    .container:hover {
+      transform: translateY(-5px);
+    }
+
+    h1 {
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--secondary);
+      margin-bottom: 2rem;
+    }
+
+    .gauge-area {
+      position: relative;
+      margin: 20px auto;
+    }
+
+    .valor-container {
+      font-size: 4rem;
+      font-weight: 800;
+      background: linear-gradient(to bottom, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 20px rgba(79, 172, 254, 0.3);
+    }
+
+    .unit {
+      font-size: 1.2rem;
+      color: #94a3b8;
+      display: block;
+      margin-top: -5px;
+    }
+
+    .status {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .dot {
+      height: 8px;
+      width: 8px;
+      background-color: #22c55e;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 10px #22c55e;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Sensor de Distancia</h1>
+    
+    <div class="gauge-area">
+      <div id="distancia" class="valor-container">--</div>
+      <span class="unit">centímetros</span>
+    </div>
+
+    <div class="status">
+      <span class="dot"></span>
+      TagoIO Live Feed
+    </div>
+  </div>
+
+  <script>
+    // Configuración de TagoIO
+    const CONFIG = {
+      TOKEN: "c5ea4051-434e-46b1-85d1-77cd68223a1d",
+      VARIABLE: "distancia",
+      URL: "https://api.tago.io/data"
+    };
+
+    /**
+     * Obtiene los últimos datos en formato JSON desde la API
+     */
+    async function fetchSensorData() {
+      try {
+        const queryUrl = `${CONFIG.URL}?variable=${CONFIG.VARIABLE}&query=last_value`;
+        
+        const response = await fetch(queryUrl, {
+          method: 'GET',
+          headers: {
+            "Device-Token": CONFIG.TOKEN,
+            "Content-Type": "application/json"
+          }
+        });
+
+        const jsonResponse = await response.json();
+
+        // Procesamiento del formato JSON de TagoIO
+        if (jsonResponse.status && jsonResponse.result.length > 0) {
+          const lastEntry = jsonResponse.result[0];
+          actualizarUI(lastEntry.value);
+        } else {
+          console.warn("JSON recibido pero sin datos válidos:", jsonResponse);
+        }
+
+      } catch (error) {
+        console.error("Error en la conexión con TagoIO:", error);
+        document.getElementById("distancia").innerText = "Err";
+      }
+    }
+
+    function actualizarUI(valor) {
+      const display = document.getElementById("distancia");
+      // Formateo a un decimal para mayor precisión técnica
+      display.innerText = parseFloat(valor).toFixed(1);
+    }
+
+    // Polling cada 3 segundos (3000ms)
+    setInterval(fetchSensorData, 3000);
+    
+    // Llamada inicial
+    fetchSensorData();
+  </script>
+</body>
+</html>
