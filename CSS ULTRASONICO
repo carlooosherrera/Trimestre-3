@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ultra-Drive Dashboard</title>
+  <style>
+    /* VARIABLES DE DISEÑO */
+    :root {
+      --pos-auto: 0%;
+      --accent: #00f2ff;
+      --danger: #ff0055;
+      --car-color: #3b82f6;
+    }
+
+    body {
+      margin: 0;
+      background: #070b14;
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      color: white;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    /* CONFIGURACIÓN DEL TOKEN (Panel Flotante) */
+    .config-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(30, 41, 59, 0.7);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 100;
+      backdrop-filter: blur(5px);
+    }
+    input {
+      background: #0f172a;
+      border: 1px solid var(--accent);
+      color: white;
+      padding: 5px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    /* PANEL DE DATOS */
+    .display {
+      text-align: center;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.9);
+      padding: 30px;
+      border-radius: 25px;
+      border-bottom: 4px solid var(--accent);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+
+    .display h1 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; color: var(--accent); }
+    .value { font-size: 64px; font-weight: 900; margin: 10px 0; }
+
+    /* ESCENARIO Y AUTO */
+    .world {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 250px;
+      background: linear-gradient(to bottom, #070b14, #1e1b4b);
+    }
+
+    .road {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 80px;
+      background: #111;
+      border-top: 4px solid #334155;
+    }
+
+    /* Líneas de la carretera animadas */
+    .road::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 200%;
+      height: 4px;
+      background: repeating-linear-gradient(90deg, #fff 0, #fff 50px, transparent 50px, transparent 100px);
+      animation: moveRoad 1.5s linear infinite;
+    }
+
+    /* AUTO DISEÑADO CON CSS */
+    .car {
+      position: absolute;
+      bottom: 40px;
+      left: var(--pos-auto);
+      width: 180px;
+      height: 60px;
+      transition: left 0.8s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+    }
+
+    .car-chassis {
+      background: var(--car-color);
+      height: 35px;
+      width: 100%;
+      border-radius: 10px 60px 10px 10px;
+      position: relative;
+      box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+    }
+
+    .car-cabin {
+      background: #1e293b;
+      height: 30px;
+      width: 90px;
+      position: absolute;
+      top: -25px;
+      left: 20px;
+      border-radius: 40px 40px 0 0;
+      border: 2px solid var(--car-color);
+    }
+
+    .car-light {
+      position: absolute;
+      right: 5px;
+      top: 10px;
+      width: 10px;
+      height: 10px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 20px 0 40px 10px var(--accent);
+    }
+
+    .wheel {
+      width: 35px;
+      height: 35px;
+      background: #000;
+      border: 4px solid #475569;
+      border-radius: 50%;
+      position: absolute;
+      bottom: -15px;
+      animation: spin 0.4s linear infinite;
+    }
+    .w-front { right: 30px; }
+    .w-back { left: 30px; }
+
+    @keyframes moveRoad { from { transform: translateX(0); } to { transform: translateX(-100px); } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  </style>
+</head>
+<body>
+
+  <div class="config-panel">
+    <label style="font-size: 10px;">DEVICE TOKEN:</label><br>
+    <input type="password" id="tokenInput" placeholder="Pega tu token aquí..." value="c5ea4051-434e-46b1-85d1-77cd68223a1d">
+  </div>
+
+  <div class="display">
+    <h1>Distancia en Tiempo Real</h1>
+    <div id="valText" class="value">-- cm</div>
+  </div>
+
+  <div class="world">
+    <div class="road"></div>
+    <div class="car" id="carBody">
+      <div class="car-cabin"></div>
+      <div class="car-chassis">
+        <div class="car-light"></div>
+      </div>
+      <div class="wheel w-back"></div>
+      <div class="wheel w-front"></div>
+    </div>
+  </div>
+
+  <script>
+    const valText = document.getElementById('valText');
+    const car = document.getElementById('carBody');
+    const tokenInput = document.getElementById('tokenInput');
+
+    async function fetchData() {
+      const currentToken = tokenInput.value;
+      if (!currentToken) return;
+
+      try {
+        const response = await fetch("https://api.tago.io/data?variable=distancia&query=last_value", {
+          headers: { "Device-Token": currentToken }
+        });
+        
+        const data = await response.json();
+
+        if (data.result && data.result.length > 0) {
+          const dist = parseFloat(data.result[0].value);
+          updateUI(dist);
+        }
+      } catch (err) {
+        console.error("Error capturando datos:", err);
+      }
+    }
+
+    function updateUI(cm) {
+      valText.innerText = cm + " cm";
+
+      // Cálculo de posición: 0cm es 0%, 200cm es 80% del ancho
+      let pos = (cm / 200) * 80;
+      if (pos > 82) pos = 82; 
+      if (pos < 0) pos = 0;
+
+      document.documentElement.style.setProperty('--pos-auto', pos + "%");
+
+      // Si está a menos de 20cm, el auto se pone rojo (Peligro)
+      if (cm < 20) {
+        document.documentElement.style.setProperty('--car-color', '#ff0055');
+        document.documentElement.style.setProperty('--accent', '#ff0055');
+      } else {
+        document.documentElement.style.setProperty('--car-color', '#3b82f6');
+        document.documentElement.style.setProperty('--accent', '#00f2ff');
+      }
+    }
+
+    // Intervalo de actualización (cada 2 segundos)
+    setInterval(fetchData, 2000);
+    fetchData();
+  </script>
+</body>
+</html>
