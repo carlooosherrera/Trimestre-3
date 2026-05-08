@@ -1,198 +1,84 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
+#include <TinyGPS++.h>
 #include <HardwareSerial.h>
-#include <TinyGPSPlus.h>
 
-// ================= WIFI =================
-const char* ssid = "TU_WIFI";
-const char* password = "TU_PASSWORD";
-
-// ================= TAGO =================
-String token = "TU_TOKEN_TAGO";
-
-// ================= GPS =================
-#define GPS_RX 16
-#define GPS_TX 17
-#define GPS_BAUD 9600
-
+// Crear objeto GPS
 TinyGPSPlus gps;
-HardwareSerial GPSSerial(2);
 
-// Tiempo de envío
-unsigned long lastSend = 0;
-const long interval = 10000;
+// UART2 del ESP32
+HardwareSerial gpsSerial(2);
 
-// Variables fecha/hora Ecuador
-int horaEC;
-int minutoEC;
-int segundoEC;
+// Pines GPS
+#define RXD2 16
+#define TXD2 17
 
 void setup() {
-
   Serial.begin(115200);
 
-  // GPS
-  GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX, GPS_TX);
+  // Iniciar GPS
+  gpsSerial.begin(9600, SERIAL_8N1, RXD2, TXD2);
 
-  // WiFi
-  WiFi.begin(ssid, password);
-
-  Serial.println("Conectando WiFi...");
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("");
-  Serial.println("WiFi conectado");
-  Serial.println(WiFi.localIP());
-
-  Serial.println("Esperando señal GPS...");
+  Serial.println("Iniciando GPS NEO-6M...");
 }
 
 void loop() {
 
-  // Leer GPS
-  while (GPSSerial.available() > 0) {
-    gps.encode(GPSSerial.read());
+  // Leer datos del GPS
+  while (gpsSerial.available() > 0) {
+    char c = gpsSerial.read();
+    gps.encode(c);
   }
 
-  // GPS válido
-  if (gps.location.isValid()) {
+  // Cuando haya ubicación válida
+  if (gps.location.isUpdated()) {
 
-    // Convertir UTC → Ecuador (UTC-5)
-    horaEC = gps.time.hour() - 5;
-
-    if (horaEC < 0) {
-      horaEC += 24;
-    }
-
-    minutoEC = gps.time.minute();
-    segundoEC = gps.time.second();
-
-    // Mostrar datos
     Serial.println("========= GPS =========");
 
+    // Latitud
     Serial.print("Latitud: ");
     Serial.println(gps.location.lat(), 6);
 
+    // Longitud
     Serial.print("Longitud: ");
     Serial.println(gps.location.lng(), 6);
 
+    // Altitud
     Serial.print("Altitud: ");
     Serial.print(gps.altitude.meters());
     Serial.println(" m");
 
+    // Velocidad
     Serial.print("Velocidad: ");
     Serial.print(gps.speed.kmph());
     Serial.println(" km/h");
 
+    // Satélites
     Serial.print("Satelites: ");
     Serial.println(gps.satellites.value());
 
-    // Fecha Ecuador
-    Serial.print("Fecha Ecuador: ");
+    // Fecha
+    Serial.print("Fecha: ");
     Serial.print(gps.date.day());
     Serial.print("/");
     Serial.print(gps.date.month());
     Serial.print("/");
     Serial.println(gps.date.year());
 
-    // Hora Ecuador
-    Serial.print("Hora Ecuador: ");
-
-    if (horaEC < 10) Serial.print("0");
-    Serial.print(horaEC);
+    // Hora
+    Serial.print("Hora UTC: ");
+    Serial.print(gps.time.hour());
     Serial.print(":");
-
-    if (minutoEC < 10) Serial.print("0");
-    Serial.print(minutoEC);
+    Serial.print(gps.time.minute());
     Serial.print(":");
+    Serial.println(gps.time.second());
 
-    if (segundoEC < 10) Serial.print("0");
-    Serial.println(segundoEC);
-
-    Serial.println("=======================");
-
-    // Enviar a Tago
-    if (millis() - lastSend > interval) {
-      lastSend = millis();
-      enviarTago();
-    }
+    Serial.println("========================");
+    Serial.println();
   }
 
-  else {
-    Serial.println("Buscando satelites...");
-    delay(2000);
-  }
-}
-
-// ================= ENVIAR TAGO =================
-void enviarTago() {
-
-  if (WiFi.status() == WL_CONNECTED) {
-
-    HTTPClient http;
-
-    http.begin("https://api.tago.io/data");
-
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("Device-Token", token);
-
-    // Fecha string
-    String fecha =
-      String(gps.date.day()) + "/" +
-      String(gps.date.month()) + "/" +
-      String(gps.date.year());
-
-    // Hora string Ecuador
-    String hora =
-      String(horaEC) + ":" +
-      String(minutoEC) + ":" +
-      String(segundoEC);
-
-    // JSON
-    String json = "[";
-
-    json += "{\"variable\":\"latitud\",\"value\":";
-    json += String(gps.location.lat(), 6);
-    json += "},";
-
-    json += "{\"variable\":\"longitud\",\"value\":";
-    json += String(gps.location.lng(), 6);
-    json += "},";
-
-    json += "{\"variable\":\"altitud\",\"value\":";
-    json += String(gps.altitude.meters());
-    json += "},";
-
-    json += "{\"variable\":\"velocidad\",\"value\":";
-    json += String(gps.speed.kmph());
-    json += "},";
-
-    json += "{\"variable\":\"satelites\",\"value\":";
-    json += String(gps.satellites.value());
-    json += "},";
-
-    json += "{\"variable\":\"fecha_ec\",\"value\":\"";
-    json += fecha;
-    json += "\"},";
-
-    json += "{\"variable\":\"hora_ec\",\"value\":\"";
-    json += hora;
-    json += "\"}";
-
-    json += "]";
-
-    Serial.println("Enviando a Tago...");
-    Serial.println(json);
-
-    int httpResponseCode = http.POST(json);
-
-    Serial.print("HTTP Response: ");
-    Serial.println(httpResponseCode);
-
-    http.end();
+  // Verificar si el GPS está conectado
+  if (millis() > 5000 && gps.charsProcessed() < 10) {
+    Serial.println("No se detecta GPS.");
+    Serial.println("Revisa conexiones.");
+    while (true);
   }
 }
