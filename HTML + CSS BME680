@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BME680 – Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;500;700&display=swap');
+
+  :root {
+    --bg:     #0a0e1a;
+    --panel:  #111827;
+    --border: #1e2d45;
+    --text:   #e2eaf6;
+    --muted:  #4a6080;
+    --accent: #00d4ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    font-family: 'Exo 2', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  /* ══════════ MODAL TOKEN ══════════ */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: #000000cc;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+    backdrop-filter: blur(6px);
+  }
+  .modal-box {
+    background: #0f1829;
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    padding: 36px 32px;
+    width: min(420px, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    box-shadow: 0 0 40px #00d4ff33;
+  }
+  .modal-box h2 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-align: center;
+  }
+  .modal-box p {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+  .modal-box label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .token-input-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .token-input {
+    flex: 1;
+    background: #1a2540;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .token-input:focus { border-color: var(--accent); }
+  .eye-btn {
+    background: #1a2540;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 16px;
+    transition: color .2s;
+  }
+  .eye-btn:hover { color: var(--accent); }
+  .connect-btn {
+    background: linear-gradient(135deg, #00d4ff, #0077cc);
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+    width: 100%;
+  }
+  .connect-btn:hover { opacity: .9; }
+  .connect-btn:active { transform: scale(.98); }
+  .modal-error {
+    font-size: 12px;
+    color: #ef4444;
+    text-align: center;
+    min-height: 16px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .token-saved-note {
+    font-size: 11px;
+    color: #4a6080;
+    text-align: center;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* ══════════ HEADER ══════════ */
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 26px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  header p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ══════════ GRID ══════════ */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+  }
+  .card-temp::before { background: linear-gradient(90deg,#ff4d4d,#ff9900); }
+  .card-hum::before  { background: linear-gradient(90deg,#00aaff,#00d4ff); }
+  .card-pres::before { background: linear-gradient(90deg,#7c4dff,#da77ff); }
+  .card-gas::before  { background: linear-gradient(90deg,#ff6a00,#ffcc00); }
+  .card-alt::before  { background: linear-gradient(90deg,#22c55e,#86efac); }
+  .card-title {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-weight: 500;
+    align-self: flex-start;
+  }
+  .value-row {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .unit {
+    font-size: 15px;
+    color: var(--muted);
+    font-weight: 300;
+    margin-left: 3px;
+  }
+  .status-txt {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .bar-track { width:100%; height:6px; background:#1a2540; border-radius:3px; overflow:hidden; }
+  .bar-fill   { height:100%; border-radius:3px; transition:width 1s ease; width:0%; }
+
+  /* ══════════ TERMÓMETRO ══════════ */
+  .thermometer {
+    width:28px; height:160px;
+    background:#1a2540; border:2px solid #2a3a5a;
+    border-radius:14px; position:relative; overflow:hidden;
+  }
+  .thermo-fill {
+    position:absolute; bottom:0; left:0; right:0;
+    background:linear-gradient(to top,#ff4500,#ff9900,#ffcc00);
+    border-radius:12px; transition:height 1s ease;
+  }
+  .thermo-bulb {
+    width:38px; height:38px;
+    background:radial-gradient(circle at 35% 35%,#ff6a00,#ff2200);
+    border-radius:50%; border:3px solid #2a3a5a;
+    margin-top:-6px; flex-shrink:0;
+  }
+  .thermo-scale { display:flex; flex-direction:column; justify-content:space-between; height:160px; padding:2px 0; }
+  .thermo-scale span { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted); }
+
+  /* ══════════ LLUVIA ══════════ */
+  .rain-drop { fill:#00aaff; opacity:0; animation:rainFall 1.5s infinite; }
+  @keyframes rainFall { 0%{transform:translateY(0);opacity:.8} 100%{transform:translateY(30px);opacity:0} }
+
+  /* ══════════ LLAMA ══════════ */
+  @keyframes flicker1 {
+    0%,100%{transform:scaleX(1) scaleY(1) translateY(0)}
+    25%{transform:scaleX(1.05) scaleY(.97) translateY(2px)}
+    50%{transform:scaleX(.96) scaleY(1.04) translateY(-2px)}
+    75%{transform:scaleX(1.03) scaleY(.98) translateY(1px)}
+  }
+  @keyframes flicker2 {
+    0%,100%{transform:scaleX(1) scaleY(1) translateY(0)}
+    33%{transform:scaleX(.94) scaleY(1.05) translateY(-3px)}
+    66%{transform:scaleX(1.04) scaleY(.96) translateY(2px)}
+  }
+  .flame-outer{animation:flicker1 .7s ease-in-out infinite;transform-origin:50% 100%}
+  .flame-mid  {animation:flicker2 .5s ease-in-out infinite;transform-origin:50% 100%}
+  .flame-inner{animation:flicker1 .4s ease-in-out infinite reverse;transform-origin:50% 100%}
+
+  /* ══════════ FLEXÓMETRO ══════════ */
+  .tape-row{display:flex;align-items:stretch;width:100%;gap:0}
+  .tape-case {
+    width:52px; background:linear-gradient(135deg,#1a7a3a,#0f5228);
+    border:2px solid #0a3d1e; border-right:none;
+    border-radius:10px 0 0 10px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:6px 4px; flex-shrink:0;
+  }
+  .tape-case-logo { font-family:'Share Tech Mono',monospace; font-size:7px; color:#86efac; letter-spacing:1px; text-align:center; line-height:1.5; }
+  .tape-case-bolt { width:10px; height:10px; background:#0a3d1e; border-radius:50%; margin-top:6px; border:1px solid #22c55e44; }
+  .tape-body {
+    flex:1; position:relative; height:54px;
+    background:#f0c020; border:2px solid #b89010;
+    border-left:3px solid #0a3d1e; border-radius:0 6px 6px 0; overflow:hidden;
+  }
+  .tape-body::before {
+    content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(90deg,transparent 0px,transparent 9px,#a07810 9px,#a07810 10px);
+    opacity:.45;
+  }
+  .tape-body::after {
+    content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(90deg,transparent 0px,transparent 49px,#7a5a00 49px,#7a5a00 51px);
+    opacity:.6;
+  }
+  .tape-labels { position:absolute; top:4px; left:0; right:0; display:flex; justify-content:space-around; pointer-events:none; }
+  .tape-labels span { font-family:'Share Tech Mono',monospace; font-size:8px; color:#4a2800; font-weight:700; }
+  .tape-indicator {
+    position:absolute; top:0; bottom:0; width:2px;
+    background:#e00; transition:left 1.2s cubic-bezier(.4,0,.2,1); left:0%; z-index:2;
+  }
+  .tape-indicator::before { content:'▼'; position:absolute; top:-14px; left:-5px; font-size:11px; color:#e00; }
+  .tape-indicator::after  { content:'▲'; position:absolute; bottom:-14px; left:-5px; font-size:11px; color:#e00; }
+  .tape-hook {
+    width:12px; height:54px;
+    background:linear-gradient(180deg,#ccc,#999,#ccc);
+    border:1px solid #777; border-radius:0 4px 4px 0;
+    display:flex; align-items:flex-end; justify-content:center;
+    padding-bottom:4px; flex-shrink:0;
+  }
+  .tape-hook::after { content:''; width:6px; height:6px; border-right:2px solid #555; border-bottom:2px solid #555; transform:rotate(-45deg); }
+
+  /* ══════════ BARRA TAGO ══════════ */
+  .tago-bar {
+    max-width:1300px; margin:28px auto 0;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:12px; padding:16px 20px;
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:12px; font-size:12px; color:var(--muted);
+    font-family:'Share Tech Mono',monospace;
+  }
+  .dot {
+    width:8px; height:8px; border-radius:50%;
+    background:#22c55e; box-shadow:0 0 8px #22c55e;
+    display:inline-block; margin-right:6px;
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .last-update{color:var(--accent)}
+  .change-token-btn {
+    background:none; border:1px solid var(--border);
+    border-radius:6px; padding:4px 10px;
+    color:var(--muted); font-family:'Share Tech Mono',monospace;
+    font-size:11px; cursor:pointer; transition:all .2s;
+  }
+  .change-token-btn:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- ══════════ MODAL TOKEN ══════════ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <h2>⚡ BME680 · TAGO.IO</h2>
+    <p>Ingresa el <strong>Device Token</strong> de tu dispositivo en Tago.io para conectar el dashboard.</p>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label>Device Token</label>
+      <div class="token-input-wrap">
+        <input class="token-input" id="tokenInput" type="password"
+               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+               autocomplete="off" spellcheck="false"/>
+        <button class="eye-btn" id="eyeBtn" title="Mostrar/ocultar">👁</button>
+      </div>
+    </div>
+
+    <div class="modal-error" id="modalError"></div>
+
+    <button class="connect-btn" id="connectBtn">CONECTAR</button>
+
+    <div class="token-saved-note" id="savedNote" style="display:none">
+      🔒 Token guardado localmente en este equipo
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <h1>BME680 · Dashboard</h1>
+  <p>Monitoreo ambiental en tiempo real · Tago.io</p>
+</header>
+
+<div class="grid">
+
+  <!-- TEMPERATURA -->
+  <div class="card card-temp">
+    <div class="card-title">🌡 Temperatura</div>
+    <div style="display:flex;align-items:flex-end;gap:10px;width:100%;justify-content:center">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="thermometer"><div class="thermo-fill" id="thermoFill" style="height:40%"></div></div>
+        <div class="thermo-bulb"></div>
+      </div>
+      <div class="thermo-scale">
+        <span>60°</span><span>50°</span><span>40°</span>
+        <span>30°</span><span>20°</span><span>10°</span><span>0°</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="value-row" id="tempVal">—<span class="unit">°C</span></div>
+        <div class="status-txt" id="tempStatus">Esperando…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUMEDAD -->
+  <div class="card card-hum">
+    <div class="card-title">💧 Humedad relativa</div>
+    <svg width="100%" height="130" viewBox="0 0 180 130" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="cloudGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#0055aa"/>
+        </linearGradient>
+        <clipPath id="cloudClip">
+          <path d="M30,95 Q10,95 10,75 Q10,58 28,56 Q26,30 50,28 Q58,12 78,18 Q90,5 108,14 Q128,8 136,28 Q158,28 162,48 Q175,50 174,68 Q174,95 150,95 Z"/>
+        </clipPath>
+      </defs>
+      <path d="M30,95 Q10,95 10,75 Q10,58 28,56 Q26,30 50,28 Q58,12 78,18 Q90,5 108,14 Q128,8 136,28 Q158,28 162,48 Q175,50 174,68 Q174,95 150,95 Z" fill="#1a2540" stroke="#2a3a5a" stroke-width="2"/>
+      <rect id="cloudFillRect" x="10" y="95" width="165" height="0" clip-path="url(#cloudClip)" fill="url(#cloudGrad)" style="transition:height 1s ease,y 1s ease;"/>
+      <ellipse cx="78" cy="40" rx="22" ry="10" fill="#ffffff10"/>
+      <circle class="rain-drop" cx="55"  cy="108" r="3" style="animation-delay:0s"/>
+      <circle class="rain-drop" cx="90"  cy="112" r="3" style="animation-delay:.3s"/>
+      <circle class="rain-drop" cx="125" cy="108" r="3" style="animation-delay:.6s"/>
+      <circle class="rain-drop" cx="72"  cy="118" r="2.5" style="animation-delay:.9s"/>
+      <circle class="rain-drop" cx="108" cy="120" r="2.5" style="animation-delay:1.2s"/>
+    </svg>
+    <div class="value-row" id="humVal">—<span class="unit">%</span></div>
+    <div class="bar-track"><div class="bar-fill" id="humBar" style="background:linear-gradient(90deg,#00aaff,#00d4ff)"></div></div>
+    <div class="status-txt" id="humStatus">Esperando…</div>
+  </div>
+
+  <!-- PRESIÓN -->
+  <div class="card card-pres">
+    <div class="card-title">⛰ Presión atmosférica</div>
+    <svg width="100%" height="140" viewBox="0 0 240 140" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="mountGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#7c4dff"/><stop offset="100%" stop-color="#da77ff"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="240" height="140" fill="#111827" rx="8"/>
+      <polygon points="0,130 60,60 110,130"    fill="#162035" stroke="#2a3a5a" stroke-width="1"/>
+      <polygon points="130,130 180,70 240,130" fill="#162035" stroke="#2a3a5a" stroke-width="1"/>
+      <polygon points="40,130 120,20 200,130"  fill="#1a2540" stroke="#2a3a5a" stroke-width="1.5"/>
+      <polygon points="120,20 107,55 133,55"   fill="#d0e8ff" opacity=".9"/>
+      <rect x="20" y="118" width="200" height="10" rx="5" fill="#1a2540"/>
+      <rect id="presBar" x="20" y="118" width="0" height="10" rx="5" fill="url(#mountGrad)" style="transition:width 1s ease;"/>
+      <text x="20"  y="112" font-size="9" fill="#4a6080" font-family="'Share Tech Mono',monospace">900</text>
+      <text x="108" y="112" font-size="9" fill="#4a6080" font-family="'Share Tech Mono',monospace">1013</text>
+      <text x="205" y="112" font-size="9" fill="#4a6080" font-family="'Share Tech Mono',monospace">1100</text>
+    </svg>
+    <div class="value-row" id="presVal">—<span class="unit">hPa</span></div>
+    <div class="status-txt" id="presStatus">Esperando…</div>
+  </div>
+
+  <!-- GAS VOC -->
+  <div class="card card-gas">
+    <div class="card-title">🔥 Gas VOC</div>
+    <svg width="90" height="120" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+      <defs>
+        <radialGradient id="glowGas" cx="50%" cy="80%" r="40%">
+          <stop offset="0%"   stop-color="#ffcc00" stop-opacity=".5"/>
+          <stop offset="100%" stop-color="#ff6a00" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="50" cy="118" rx="36" ry="10" fill="url(#glowGas)"/>
+      <g class="flame-outer">
+        <path d="M50,125 C30,110 10,85 20,55 C28,32 15,18 22,5 C32,25 28,38 40,38 C35,22 45,8 50,0 C55,8 65,22 60,38 C72,38 68,25 78,5 C85,18 72,32 80,55 C90,85 70,110 50,125 Z" fill="#ff6a00" opacity=".85"/>
+      </g>
+      <g class="flame-mid">
+        <path d="M50,122 C34,108 20,88 28,62 C34,44 28,32 34,20 C40,34 37,44 46,44 C42,30 48,18 50,10 C52,18 58,30 54,44 C63,44 60,34 66,20 C72,32 66,44 72,62 C80,88 66,108 50,122 Z" fill="#ff9900" opacity=".9"/>
+      </g>
+      <g class="flame-inner">
+        <path d="M50,118 C38,106 30,90 36,72 C40,58 37,48 42,38 C46,48 44,56 50,56 C56,56 54,48 58,38 C63,48 60,58 64,72 C70,90 62,106 50,118 Z" fill="#ffcc00"/>
+      </g>
+      <ellipse cx="50" cy="124" rx="18" ry="5" fill="#ff4500" opacity=".8"/>
+    </svg>
+    <div class="value-row" id="gasVal">—<span class="unit">kΩ</span></div>
+    <div class="bar-track" style="width:90%">
+      <div class="bar-fill" id="gasBar" style="background:linear-gradient(90deg,#ff6a00,#ffcc00)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;width:90%">
+      <span class="status-txt">0</span>
+      <span class="status-txt" id="gasStatus">Esperando…</span>
+      <span class="status-txt">500 kΩ</span>
+    </div>
+  </div>
+
+  <!-- ALTITUD -->
+  <div class="card card-alt">
+    <div class="card-title">📏 Altitud</div>
+    <div style="width:100%;display:flex;flex-direction:column;gap:6px;align-items:center;">
+      <div class="tape-row">
+        <div class="tape-case">
+          <div class="tape-case-logo">ALT<br>BME<br>680</div>
+          <div class="tape-case-bolt"></div>
+        </div>
+        <div class="tape-body">
+          <div class="tape-labels">
+            <span>0</span><span>1k</span><span>2k</span>
+            <span>3k</span><span>4k</span><span>5k</span><span>6k</span>
+          </div>
+          <div class="tape-indicator" id="tapeIndicator"></div>
+        </div>
+        <div class="tape-hook"></div>
+      </div>
+      <div class="value-row" id="altVal">—<span class="unit">m</span></div>
+      <div class="bar-track" style="width:100%">
+        <div class="bar-fill" id="altBar" style="background:linear-gradient(90deg,#22c55e,#86efac)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;width:100%">
+        <span class="status-txt">0 m</span>
+        <span class="status-txt" id="altStatus">Esperando…</span>
+        <span class="status-txt">6 000 m</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- BARRA TAGO -->
+<div class="tago-bar">
+  <div><span class="dot"></span>Tago.io · BME680</div>
+  <div>Última actualización: <span class="last-update" id="lastTime">—</span></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="tagoStatus" style="color:#22c55e;">● Conectado</span>
+    <button class="change-token-btn" id="changeTokenBtn">🔑 Cambiar token</button>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════
+   Variables del Arduino / Tago.io
+   (deben coincidir exactamente con tu código ESP32)
+══════════════════════════════════════════════════ */
+const VAR_TEMP = "temperature";
+const VAR_HUM  = "humidity";
+const VAR_PRES = "pressure";
+const VAR_GAS  = "gas_resistance";  // llega en Ohms → se convierte a kΩ
+const VAR_ALT  = "altitude";
+
+const INTERVAL = 5000; // ms
+
+/* ── DOM refs ── */
+const modalOverlay  = document.getElementById("modalOverlay");
+const tokenInput    = document.getElementById("tokenInput");
+const eyeBtn        = document.getElementById("eyeBtn");
+const connectBtn    = document.getElementById("connectBtn");
+const modalError    = document.getElementById("modalError");
+const savedNote     = document.getElementById("savedNote");
+const changeTokenBtn= document.getElementById("changeTokenBtn");
+
+const thermoFill = document.getElementById("thermoFill");
+const tempVal    = document.getElementById("tempVal");
+const tempStatus = document.getElementById("tempStatus");
+const cloudFill  = document.getElementById("cloudFillRect");
+const humVal     = document.getElementById("humVal");
+const humBar     = document.getElementById("humBar");
+const humStatus  = document.getElementById("humStatus");
+const presBar    = document.getElementById("presBar");
+const presVal    = document.getElementById("presVal");
+const presStatus = document.getElementById("presStatus");
+const gasVal     = document.getElementById("gasVal");
+const gasBar     = document.getElementById("gasBar");
+const gasStatus  = document.getElementById("gasStatus");
+const altVal     = document.getElementById("altVal");
+const altBar     = document.getElementById("altBar");
+const altStatus  = document.getElementById("altStatus");
+const tapeInd    = document.getElementById("tapeIndicator");
+const lastTime   = document.getElementById("lastTime");
+const tagoStatus = document.getElementById("tagoStatus");
+
+let TAGO_TOKEN = "";
+let pollTimer  = null;
+
+/* ── Mostrar/ocultar contraseña ── */
+eyeBtn.addEventListener("click", () => {
+  tokenInput.type = tokenInput.type === "password" ? "text" : "password";
+});
+
+/* ── Enter en el input conecta ── */
+tokenInput.addEventListener("keydown", e => { if (e.key === "Enter") connectBtn.click(); });
+
+/* ── Botón Conectar ── */
+connectBtn.addEventListener("click", async () => {
+  const t = tokenInput.value.trim();
+  if (!t) { modalError.textContent = "Por favor ingresa el token."; return; }
+  modalError.textContent = "";
+  connectBtn.textContent = "Verificando…";
+  connectBtn.disabled = true;
+
+  const ok = await testToken(t);
+  connectBtn.textContent = "CONECTAR";
+  connectBtn.disabled = false;
+
+  if (ok) {
+    TAGO_TOKEN = t;
+    localStorage.setItem("bme680_token", t);
+    modalOverlay.style.display = "none";
+    startPolling();
+  } else {
+    modalError.textContent = "❌ Token inválido o sin datos. Verifica en Tago.io.";
+  }
+});
+
+/* ── Cambiar token ── */
+changeTokenBtn.addEventListener("click", () => {
+  clearInterval(pollTimer);
+  tokenInput.value = TAGO_TOKEN;
+  savedNote.style.display = "none";
+  modalOverlay.style.display = "flex";
+});
+
+/* ── Verifica el token haciendo una petición real ── */
+async function testToken(token) {
+  try {
+    const res = await fetch(
+      `https://api.tago.io/data?variable=${VAR_TEMP}&qty=1`,
+      { headers: { "Device-Token": token } }
+    );
+    if (!res.ok) return false;
+    const json = await res.json();
+    // Tago devuelve {status:true, result:[...]}
+    return json.status === true;
+  } catch { return false; }
+}
+
+/* ── Fetch de una variable ── */
+async function fetchVar(varName) {
+  const res = await fetch(
+    `https://api.tago.io/data?variable=${varName}&qty=1`,
+    { headers: { "Device-Token": TAGO_TOKEN } }
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.result && json.result.length > 0) {
+    return parseFloat(json.result[0].value);
+  }
+  return null;
+}
+
+/* ── Actualiza la UI ── */
+function updateUI(temp, hum, pres, gasOhm, alt) {
+  lastTime.textContent   = new Date().toLocaleTimeString("es-EC");
+  tagoStatus.textContent = "● Conectado";
+  tagoStatus.style.color = "#22c55e";
+
+  /* Temperatura (0–60 °C) */
+  if (temp !== null) {
+    const t = parseFloat(temp.toFixed(1));
+    tempVal.innerHTML = `${t}<span class="unit">°C</span>`;
+    thermoFill.style.height = Math.min(100, Math.max(0, t / 60 * 100)) + "%";
+    tempStatus.textContent = t < 10 ? "Frío ❄️" : t < 25 ? "Confort ✅" : t < 35 ? "Cálido 🌤" : "Caluroso 🔆";
+  }
+
+  /* Humedad (0–100 %) */
+  if (hum !== null) {
+    const h = Math.round(hum);
+    humVal.innerHTML = `${h}<span class="unit">%</span>`;
+    humBar.style.width = h + "%";
+    cloudFill.setAttribute("height", (h / 100) * 85);
+    cloudFill.setAttribute("y", 95 - (h / 100) * 85);
+    humStatus.textContent = h < 30 ? "Seco 🌵" : h < 60 ? "Normal ✅" : h < 80 ? "Húmedo 🌧" : "Muy húmedo 💦";
+  }
+
+  /* Presión (900–1100 hPa) */
+  if (pres !== null) {
+    const p = Math.round(pres);
+    presVal.innerHTML = `${p}<span class="unit">hPa</span>`;
+    presBar.style.width = (Math.min(100, Math.max(0, (p - 900) / 200 * 100)) / 100 * 200) + "px";
+    presStatus.textContent = p < 1000 ? "Baja presión 🌪" : p < 1020 ? "Normal ✅" : "Alta presión 🏔";
+  }
+
+  /* Gas VOC — Arduino envía Ohms crudos, mostramos XX.X kΩ */
+  if (gasOhm !== null) {
+    const ohms = gasOhm < 2000 ? gasOhm * 1000 : gasOhm; // por si viene en kΩ
+    const gk   = (Math.round(ohms / 100) / 10).toFixed(1); // → XX.X kΩ
+    gasVal.innerHTML = `${gk}<span class="unit">kΩ</span>`;
+    gasBar.style.width = Math.min(100, parseFloat(gk) / 500 * 100) + "%";
+    const gv = parseFloat(gk);
+    gasStatus.textContent = gv > 300 ? "Aire limpio 🌿" : gv > 100 ? "Moderado ⚠️" : "VOC alto ☠️";
+    const spd = gv > 300 ? "1.1s" : gv > 100 ? "0.65s" : "0.3s";
+    document.querySelectorAll(".flame-outer,.flame-mid,.flame-inner")
+            .forEach(el => el.style.animationDuration = spd);
+  }
+
+  /* Altitud (m) — viene directo del Arduino: bme.readAltitude() */
+  if (alt !== null) {
+    const a = Math.max(0, Math.round(alt));
+    altVal.innerHTML = `${a.toLocaleString("es-EC")}<span class="unit">m</span>`;
+    const pct = Math.min(100, a / 6000 * 100);
+    altBar.style.width = pct + "%";
+    tapeInd.style.left = `calc(${pct}% - 1px)`;
+    altStatus.textContent =
+      a < 500  ? "Nivel bajo 🌊" :
+      a < 1500 ? "Valle 🌄"      :
+      a < 3000 ? "Montaña ⛰"    :
+      a < 5000 ? "Alta montaña 🏔" : "Cima 🗻";
+  }
+}
+
+/* ── Polling Tago.io ── */
+async function poll() {
+  try {
+    const [temp, hum, pres, gasOhm, alt] = await Promise.all([
+      fetchVar(VAR_TEMP),
+      fetchVar(VAR_HUM),
+      fetchVar(VAR_PRES),
+      fetchVar(VAR_GAS),
+      fetchVar(VAR_ALT)
+    ]);
+    updateUI(temp, hum, pres, gasOhm, alt);
+  } catch(e) {
+    tagoStatus.textContent = "● Error de conexión";
+    tagoStatus.style.color = "#ef4444";
+    console.error("Tago.io error:", e);
+  }
+}
+
+function startPolling() {
+  poll();
+  pollTimer = setInterval(poll, INTERVAL);
+}
+
+/* ── Al cargar: busca token guardado ── */
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem("bme680_token");
+  if (saved) {
+    tokenInput.value = saved;
+    savedNote.style.display = "block";
+  }
+});
+</script>
+</body>
+</html>
