@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPS NEO-6M · Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap');
+
+:root {
+  --bg:      #04060f;
+  --panel:   #080d1c;
+  --glass:   rgba(255,255,255,0.03);
+  --border:  rgba(255,255,255,0.07);
+  --text:    #cdd9f0;
+  --muted:   #3a5080;
+  --accent:  #00e5ff;
+  --gold:    #ffd040;
+  --green:   #00ff88;
+  --red:     #ff3355;
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+body {
+  background: var(--bg);
+  font-family: 'Rajdhani', sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── STARFIELD ── */
+#stars {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, #0a1a3a22 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, #1a0a3a22 0%, transparent 60%);
+}
+.star {
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+  animation: twinkle var(--d) ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%,100%{ opacity:.2; transform:scale(1); }
+  50%    { opacity:.9; transform:scale(1.4); }
+}
+
+/* ── MODAL TOKEN ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: #000000dd;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999;
+  backdrop-filter: blur(10px);
+}
+.modal-box {
+  background: linear-gradient(135deg, #060c1e, #0c1630);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  padding: 40px 36px;
+  width: min(440px, 94vw);
+  display: flex; flex-direction: column; gap: 20px;
+  box-shadow: 0 0 60px #00e5ff22, 0 0 120px #00e5ff0a;
+}
+.modal-box h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 16px; letter-spacing: 4px;
+  color: var(--accent); text-align: center;
+}
+.modal-box p {
+  font-size: 14px; color: var(--muted);
+  text-align: center; line-height: 1.6;
+}
+.modal-label {
+  font-size: 11px; letter-spacing: 2px;
+  color: var(--muted); text-transform: uppercase;
+}
+.token-row { display: flex; gap: 8px; }
+.token-inp {
+  flex: 1;
+  background: #0a1428; border: 1px solid var(--border);
+  border-radius: 8px; padding: 13px 16px;
+  color: var(--text); font-family: 'Orbitron', monospace; font-size: 11px;
+  outline: none; transition: border-color .2s;
+}
+.token-inp:focus { border-color: var(--accent); }
+.eye-btn {
+  background: #0a1428; border: 1px solid var(--border);
+  border-radius: 8px; padding: 0 14px;
+  color: var(--muted); cursor: pointer; font-size: 16px;
+  transition: color .2s;
+}
+.eye-btn:hover { color: var(--accent); }
+.conn-btn {
+  background: linear-gradient(135deg, #00b8d4, #0077aa);
+  border: none; border-radius: 10px; padding: 15px;
+  color: #fff; font-family: 'Orbitron', monospace;
+  font-size: 12px; letter-spacing: 3px; cursor: pointer;
+  transition: opacity .2s, transform .1s;
+}
+.conn-btn:hover { opacity: .9; }
+.conn-btn:active { transform: scale(.98); }
+.modal-err { font-size: 12px; color: var(--red); text-align: center; min-height: 16px; font-family: 'Orbitron', monospace; }
+
+/* ── LAYOUT ── */
+.wrapper {
+  position: relative; z-index: 1;
+  padding: 28px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+header h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(18px, 3vw, 30px);
+  letter-spacing: 6px;
+  background: linear-gradient(90deg, #00e5ff, #00ff88, #ffd040);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  text-transform: uppercase;
+}
+header p {
+  font-size: 12px; letter-spacing: 3px;
+  color: var(--muted); margin-top: 6px; text-transform: uppercase;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 16px;
+  position: relative; overflow: hidden;
+  transition: border-color .3s;
+}
+.card:hover { border-color: rgba(255,255,255,0.15); }
+.card::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  border-radius: 20px 20px 0 0;
+}
+.c-lat::before   { background: linear-gradient(90deg,#00e5ff,#0055ff); }
+.c-lng::before   { background: linear-gradient(90deg,#aa00ff,#ff00aa); }
+.c-alt::before   { background: linear-gradient(90deg,#7c4dff,#00e5ff); }
+.c-spd::before   { background: linear-gradient(90deg,#ff3355,#ff9900); }
+.c-sat::before   { background: linear-gradient(90deg,#00ff88,#00e5ff); }
+.c-dt::before    { background: linear-gradient(90deg,#ffcc00,#003893); }
+
+.card-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 10px; letter-spacing: 3px;
+  color: var(--muted); text-transform: uppercase;
+  align-self: flex-start;
+}
+.big-val {
+  font-family: 'Orbitron', monospace;
+  font-size: 28px; font-weight: 700;
+  color: #fff; white-space: nowrap; line-height: 1;
+}
+.big-val .u { font-size: 13px; color: var(--muted); margin-left: 4px; }
+.sub-lbl {
+  font-size: 12px; letter-spacing: 2px;
+  color: var(--muted); font-family: 'Rajdhani', sans-serif;
+}
+.bar-t { width:100%; height:5px; background:#0a1428; border-radius:3px; overflow:hidden; }
+.bar-f { height:100%; border-radius:3px; transition:width 1s ease; width:0%; }
+
+/* ════════════════════════════════
+   1 · LATITUD — GLOBO TERRESTRE
+   ════════════════════════════════ */
+.globe-wrap {
+  position: relative; width: 150px; height: 150px;
+}
+.globe-svg { width: 150px; height: 150px; }
+/* línea de latitud animada */
+@keyframes globeSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.globe-clouds {
+  animation: globeSpin 20s linear infinite;
+  transform-origin: 75px 75px;
+}
+.globe-needle {
+  position: absolute; left: 50%; top: 0;
+  width: 2px; height: 50%;
+  background: linear-gradient(to bottom, transparent, var(--red));
+  transform-origin: bottom center;
+  transition: transform 1s ease;
+  transform: translateX(-50%) rotate(0deg);
+}
+.globe-dot {
+  position: absolute; left: 50%; top: 0;
+  width: 10px; height: 10px;
+  background: var(--red);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--red);
+  transform: translateX(-50%) translateY(-4px);
+}
+
+/* ════════════════════════════════
+   2 · LONGITUD — SATURNO
+   ════════════════════════════════ */
+.saturn-wrap {
+  position: relative; width: 180px; height: 130px;
+  display: flex; align-items: center; justify-content: center;
+}
+.saturn-svg { width: 180px; height: 130px; }
+@keyframes ringPulse {
+  0%,100%{ opacity:.7; } 50%{ opacity:1; }
+}
+.ring-active { animation: ringPulse 2s ease-in-out infinite; }
+
+/* ════════════════════════════════
+   3 · ALTITUD — MONTAÑA
+   ════════════════════════════════ */
+.mountain-svg { width: 100%; height: 150px; }
+
+/* ════════════════════════════════
+   4 · VELOCIDAD — F1
+   ════════════════════════════════ */
+.speedo-wrap {
+  position: relative; width: 170px; height: 170px;
+}
+.speedo-svg { width: 170px; height: 170px; }
+.needle-group { transform-origin: 85px 110px; transition: transform 1s cubic-bezier(.4,0,.2,1); }
+/* F1 car SVG under gauge */
+.f1-svg { width: 100%; max-width: 200px; height: 60px; }
+@keyframes f1zoom { 0%,100%{ transform:scaleX(1); } 50%{ transform:scaleX(1.04); } }
+.f1-body { animation: f1zoom .8s ease-in-out infinite; transform-origin: center; }
+
+/* ════════════════════════════════
+   5 · SATÉLITES — COHETE
+   ════════════════════════════════ */
+.rocket-wrap {
+  position: relative; width: 200px; height: 150px;
+}
+.rocket-svg { width: 200px; height: 150px; }
+@keyframes rocketFloat {
+  0%,100%{ transform: translateY(0); }
+  50%    { transform: translateY(-8px); }
+}
+@keyframes rocketFire {
+  0%,100%{ transform: scaleY(1) scaleX(1); opacity:.9; }
+  50%    { transform: scaleY(1.4) scaleX(.85); opacity:1; }
+}
+.rocket-body { animation: rocketFloat 2s ease-in-out infinite; transform-origin: 60px 75px; }
+.rocket-fire { animation: rocketFire .4s ease-in-out infinite; transform-origin: 60px 115px; }
+@keyframes satOrbit {
+  from { transform: rotate(0deg) translateX(70px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(70px) rotate(-360deg); }
+}
+.sat-orbit { animation: satOrbit 4s linear infinite; transform-origin: 120px 50px; }
+.signal-beam { stroke-dasharray: 6 4; animation: beamFlow .6s linear infinite; }
+@keyframes beamFlow { from{ stroke-dashoffset:0; } to{ stroke-dashoffset:-10; } }
+
+/* ════════════════════════════════
+   6 · FECHA/HORA — BANDERA ECUADOR
+   ════════════════════════════════ */
+.ecuador-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%;
+}
+.flag-svg { width: 180px; height: 100px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 24px #0006; }
+.clock-ring { width: 130px; height: 130px; }
+@keyframes secTick {
+  from{ stroke-dashoffset: 314; } to{ stroke-dashoffset: 0; }
+}
+
+/* ── TAGO BAR ── */
+.tago-bar {
+  max-width: 1400px; margin: 24px auto 0;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; padding: 16px 24px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; font-family: 'Orbitron', monospace; font-size: 10px;
+  color: var(--muted); letter-spacing: 2px; position: relative; z-index: 1;
+}
+.pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 8px var(--green);
+  display: inline-block; margin-right: 8px;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.2} }
+.tago-accent { color: var(--accent); }
+.chg-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 12px;
+  color: var(--muted); font-family: 'Orbitron', monospace;
+  font-size: 9px; cursor: pointer; letter-spacing: 1px;
+  transition: all .2s;
+}
+.chg-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Estrellas -->
+<canvas id="stars"></canvas>
+
+<!-- ══════════ MODAL TOKEN ══════════ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <h2>🛰 GPS NEO-6M · TAGO.IO</h2>
+    <p>Ingresa tu <strong>Device Token</strong> de Tago.io para conectar el dashboard al módulo GPS.</p>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div class="modal-label">Device Token</div>
+      <div class="token-row">
+        <input class="token-inp" id="tokenInp" type="password"
+               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+               autocomplete="off" spellcheck="false"/>
+        <button class="eye-btn" id="eyeBtn">👁</button>
+      </div>
+    </div>
+    <div class="modal-err" id="modalErr"></div>
+    <button class="conn-btn" id="connBtn">CONECTAR</button>
+  </div>
+</div>
+
+<!-- ══════════ HEADER ══════════ -->
+<div class="wrapper">
+<header>
+  <h1>GPS NEO-6M · Dashboard</h1>
+  <p>Rastreo GPS en tiempo real · Tago.io · Ecuador</p>
+</header>
+
+<div class="grid">
+
+  <!-- ══ 1 · LATITUD ══ -->
+  <div class="card c-lat">
+    <div class="card-title">🌍 Latitud</div>
+
+    <div class="globe-wrap">
+      <!-- Aguja indicadora -->
+      <div class="globe-needle" id="latNeedle">
+        <div class="globe-dot"></div>
+      </div>
+      <svg class="globe-svg" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="globeGrad" cx="38%" cy="35%">
+            <stop offset="0%"   stop-color="#1a6bcc"/>
+            <stop offset="60%"  stop-color="#0a3a80"/>
+            <stop offset="100%" stop-color="#040f28"/>
+          </radialGradient>
+          <clipPath id="globeClip"><circle cx="75" cy="75" r="62"/></clipPath>
+        </defs>
+        <!-- Océano -->
+        <circle cx="75" cy="75" r="62" fill="url(#globeGrad)" stroke="#00e5ff44" stroke-width="1.5"/>
+        <!-- Continentes estilizados -->
+        <g clip-path="url(#globeClip)" fill="#2d8a4e" opacity=".9">
+          <ellipse cx="55" cy="55" rx="20" ry="28"/>
+          <ellipse cx="90" cy="50" rx="16" ry="22"/>
+          <ellipse cx="75" cy="90" rx="22" ry="16"/>
+          <ellipse cx="38" cy="85" rx="10" ry="14"/>
+          <ellipse cx="115" cy="80" rx="12" ry="10"/>
+        </g>
+        <!-- Nubes -->
+        <g class="globe-clouds" clip-path="url(#globeClip)" fill="#ffffff18">
+          <ellipse cx="60" cy="35" rx="18" ry="7"/>
+          <ellipse cx="100" cy="65" rx="14" ry="5"/>
+          <ellipse cx="45" cy="100" rx="16" ry="6"/>
+        </g>
+        <!-- Líneas de latitud -->
+        <g clip-path="url(#globeClip)" stroke="#ffffff18" stroke-width="1" fill="none">
+          <ellipse cx="75" cy="75" rx="62" ry="15"/>
+          <ellipse cx="75" cy="75" rx="62" ry="35"/>
+          <ellipse cx="75" cy="55" rx="55" ry="12"/>
+          <ellipse cx="75" cy="95" rx="55" ry="12"/>
+          <!-- Ecuador line highlight -->
+          <ellipse cx="75" cy="75" rx="62" ry="4" stroke="#ffcc0066" stroke-width="1.5"/>
+        </g>
+        <!-- Brillo -->
+        <ellipse cx="55" cy="45" rx="18" ry="12" fill="#ffffff0c"/>
+        <!-- Borde glow -->
+        <circle cx="75" cy="75" r="62" fill="none" stroke="#00e5ff" stroke-width="1.5" opacity=".4"/>
+      </svg>
+    </div>
+
+    <div class="big-val" id="latVal">—<span class="u">°</span></div>
+    <div class="bar-t"><div class="bar-f" id="latBar" style="background:linear-gradient(90deg,#0055ff,#00e5ff)"></div></div>
+    <div class="sub-lbl" id="latStatus">Esperando señal…</div>
+  </div>
+
+  <!-- ══ 2 · LONGITUD ══ -->
+  <div class="card c-lng">
+    <div class="card-title">🪐 Longitud</div>
+
+    <div class="saturn-wrap">
+      <svg class="saturn-svg" viewBox="0 0 180 130" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="satGrad" cx="38%" cy="35%">
+            <stop offset="0%"   stop-color="#e8c87a"/>
+            <stop offset="50%"  stop-color="#c8943a"/>
+            <stop offset="100%" stop-color="#7a4a10"/>
+          </radialGradient>
+          <radialGradient id="ringGrad" cx="50%" cy="50%">
+            <stop offset="0%"   stop-color="#c8a04888"/>
+            <stop offset="40%"  stop-color="#e8c87aaa"/>
+            <stop offset="70%"  stop-color="#c8943a66"/>
+            <stop offset="100%" stop-color="transparent"/>
+          </radialGradient>
+        </defs>
+        <!-- Anillo trasero -->
+        <ellipse cx="90" cy="68" rx="70" ry="16" fill="none"
+                 stroke="#c8943a" stroke-width="8" opacity=".35"/>
+        <!-- Planeta -->
+        <circle cx="90" cy="65" r="38" fill="url(#satGrad)"/>
+        <!-- Bandas del planeta -->
+        <g clip-path="url(#satClip)">
+          <ellipse cx="90" cy="55" rx="38" ry="6" fill="#00000020"/>
+          <ellipse cx="90" cy="68" rx="38" ry="5" fill="#00000028"/>
+          <ellipse cx="90" cy="78" rx="38" ry="4" fill="#00000015"/>
+        </g>
+        <clipPath id="satClip"><circle cx="90" cy="65" r="38"/></clipPath>
+        <!-- Brillo -->
+        <ellipse cx="76" cy="50" rx="14" ry="8" fill="#ffffff18"/>
+        <!-- Anillo frontal con indicador -->
+        <ellipse cx="90" cy="68" rx="70" ry="16" fill="none"
+                 stroke="#e8c87a" stroke-width="5" opacity=".55"
+                 stroke-dasharray="220 220" id="lngRing"/>
+        <!-- Punto indicador en el anillo -->
+        <circle id="lngDot" cx="160" cy="68" r="6"
+                fill="#ff00aa" filter="url(#glow)"/>
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="big-val" id="lngVal">—<span class="u">°</span></div>
+    <div class="bar-t"><div class="bar-f" id="lngBar" style="background:linear-gradient(90deg,#aa00ff,#ff00aa)"></div></div>
+    <div class="sub-lbl" id="lngStatus">Esperando señal…</div>
+  </div>
+
+  <!-- ══ 3 · ALTITUD ══ -->
+  <div class="card c-alt">
+    <div class="card-title">⛰ Altitud</div>
+
+    <svg class="mountain-svg" viewBox="0 0 280 150" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stop-color="#040818"/>
+          <stop offset="100%" stop-color="#0a1a3a"/>
+        </linearGradient>
+        <linearGradient id="mtnGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#7c9ab0"/>
+          <stop offset="30%"  stop-color="#5a7a94"/>
+          <stop offset="100%" stop-color="#2a4a5e"/>
+        </linearGradient>
+        <linearGradient id="altBarGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#00e5ff"/>
+          <stop offset="100%" stop-color="#7c4dff"/>
+        </linearGradient>
+        <filter id="mtnGlow">
+          <feGaussianBlur stdDeviation="2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="280" height="150" fill="url(#skyGrad)" rx="8"/>
+      <!-- Montañas fondo -->
+      <polygon points="0,150 60,70 110,150"   fill="#1a2a3a"/>
+      <polygon points="170,150 230,60 280,150" fill="#1a2a3a"/>
+      <!-- Montaña principal -->
+      <polygon points="20,150 140,18 260,150"  fill="url(#mtnGrad)" filter="url(#mtnGlow)"/>
+      <!-- Nieve -->
+      <polygon points="140,18 115,58 165,58"   fill="#d0e8f8" opacity=".95"/>
+      <!-- Nubes -->
+      <ellipse cx="50"  cy="40" rx="22" ry="9" fill="#ffffff0d"/>
+      <ellipse cx="230" cy="35" rx="18" ry="7" fill="#ffffff0d"/>
+      <!-- Barra de altitud vertical -->
+      <rect x="260" y="20" width="10" height="120" rx="5" fill="#0a1428"/>
+      <rect x="260" y="20" width="10" height="120" rx="5" fill="#0a1428"/>
+      <rect id="altBarRect" x="260" y="140" width="10" height="0" rx="5" fill="url(#altBarGrad)" style="transition:height 1s ease,y 1s ease;"/>
+      <!-- Estrella en la cima -->
+      <circle cx="140" cy="14" r="4" fill="#ffd040" filter="url(#mtnGlow)"/>
+      <!-- Labels altitud -->
+      <text x="256" y="24"  font-size="7" fill="#3a5080" font-family="Orbitron" text-anchor="end">6k</text>
+      <text x="256" y="85"  font-size="7" fill="#3a5080" font-family="Orbitron" text-anchor="end">3k</text>
+      <text x="256" y="144" font-size="7" fill="#3a5080" font-family="Orbitron" text-anchor="end">0</text>
+    </svg>
+
+    <div class="big-val" id="altVal">—<span class="u">m</span></div>
+    <div class="sub-lbl" id="altStatus">Esperando señal…</div>
+  </div>
+
+  <!-- ══ 4 · VELOCIDAD — F1 ══ -->
+  <div class="card c-spd">
+    <div class="card-title">🏎 Velocidad</div>
+
+    <!-- Velocímetro -->
+    <div class="speedo-wrap">
+      <svg class="speedo-svg" viewBox="0 0 170 170" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="spdArcGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#00ff88"/>
+            <stop offset="50%"  stop-color="#ffd040"/>
+            <stop offset="100%" stop-color="#ff3355"/>
+          </linearGradient>
+        </defs>
+        <!-- Fondo -->
+        <circle cx="85" cy="110" r="75" fill="#060c1e" stroke="#0a1428" stroke-width="2"/>
+        <!-- Arco fondo -->
+        <path d="M 18 110 A 67 67 0 0 1 152 110" fill="none" stroke="#0a1428" stroke-width="14" stroke-linecap="round"/>
+        <!-- Arco activo (se actualiza desde JS) -->
+        <path id="spdArc" d="M 18 110 A 67 67 0 0 1 152 110" fill="none"
+              stroke="url(#spdArcGrad)" stroke-width="14" stroke-linecap="round"
+              stroke-dasharray="211" stroke-dashoffset="211" style="transition:stroke-dashoffset 1s ease;"/>
+        <!-- Marcas -->
+        <g stroke="#1a2a4a" stroke-width="1.5" fill="none">
+          <line x1="85" y1="45" x2="85" y2="58"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(-72,85,110)"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(-54,85,110)"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(-36,85,110)"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(-18,85,110)"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(18,85,110)"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(36,85,110)"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(54,85,110)"/>
+          <line x1="85" y1="45" x2="85" y2="55" transform="rotate(72,85,110)"/>
+        </g>
+        <!-- Labels km/h -->
+        <text x="20"  y="118" font-size="9" fill="#3a5080" font-family="Orbitron" text-anchor="middle">0</text>
+        <text x="45"  y="60"  font-size="9" fill="#3a5080" font-family="Orbitron" text-anchor="middle">50</text>
+        <text x="85"  y="44"  font-size="9" fill="#3a5080" font-family="Orbitron" text-anchor="middle">100</text>
+        <text x="126" y="60"  font-size="9" fill="#3a5080" font-family="Orbitron" text-anchor="middle">150</text>
+        <text x="150" y="118" font-size="9" fill="#3a5080" font-family="Orbitron" text-anchor="middle">200</text>
+        <!-- Aguja -->
+        <g class="needle-group" id="spdNeedle">
+          <line x1="85" y1="110" x2="85" y2="52" stroke="#ff3355" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="85" cy="110" r="7" fill="#ff3355"/>
+          <circle cx="85" cy="110" r="4" fill="#ff6677"/>
+        </g>
+        <!-- Valor central -->
+        <text id="spdCenterVal" x="85" y="140" font-size="22" fill="#fff" font-family="Orbitron" text-anchor="middle" font-weight="700">0</text>
+        <text x="85" y="154" font-size="9" fill="#3a5080" font-family="Orbitron" text-anchor="middle">KM/H</text>
+      </svg>
+    </div>
+
+    <!-- F1 Car SVG -->
+    <svg class="f1-svg" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+      <g class="f1-body">
+        <!-- Cuerpo principal -->
+        <path d="M30,38 L50,28 L90,24 L140,24 L165,32 L175,38 L165,42 L30,42 Z" fill="#cc0000"/>
+        <!-- Ala delantera -->
+        <path d="M145,42 L185,42 L185,46 L165,48 L145,46 Z" fill="#cc0000"/>
+        <rect x="145" y="40" width="40" height="2" fill="#fff"/>
+        <!-- Ala trasera -->
+        <path d="M28,30 L12,30 L12,34 L28,36 Z" fill="#cc0000"/>
+        <rect x="12" y="30" width="16" height="2" fill="#fff"/>
+        <!-- Cockpit -->
+        <path d="M85,24 L100,15 L125,15 L140,24 Z" fill="#111"/>
+        <!-- Ruedas -->
+        <circle cx="50"  cy="43" r="9"  fill="#222" stroke="#444" stroke-width="2"/>
+        <circle cx="50"  cy="43" r="4"  fill="#555"/>
+        <circle cx="155" cy="43" r="9"  fill="#222" stroke="#444" stroke-width="2"/>
+        <circle cx="155" cy="43" r="4"  fill="#555"/>
+        <!-- Escudería -->
+        <text x="85" y="36" font-size="8" fill="#fff" font-family="Orbitron" text-anchor="middle" font-weight="700">GPS·RACING</text>
+        <!-- Llamas del escape -->
+        <ellipse cx="20" cy="38" rx="8" ry="4" fill="#ff6600" opacity=".8" id="f1flame"/>
+      </g>
+    </svg>
+
+    <div class="big-val" id="spdVal">0<span class="u">km/h</span></div>
+    <div class="sub-lbl" id="spdStatus">Detenido</div>
+  </div>
+
+  <!-- ══ 5 · SATÉLITES — COHETE ══ -->
+  <div class="card c-sat">
+    <div class="card-title">🚀 Satélites</div>
+
+    <div class="rocket-wrap">
+      <svg class="rocket-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="spaceGrad" cx="50%" cy="50%">
+            <stop offset="0%"   stop-color="#0a0f28"/>
+            <stop offset="100%" stop-color="#04060f"/>
+          </radialGradient>
+          <filter id="satGlow">
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <rect width="200" height="150" fill="url(#spaceGrad)" rx="8"/>
+        <!-- Estrellas pequeñas -->
+        <g fill="#fff" opacity=".6">
+          <circle cx="10"  cy="15" r="1"/>  <circle cx="35"  cy="8"  r=".8"/>
+          <circle cx="180" cy="20" r="1"/>  <circle cx="165" cy="40" r=".8"/>
+          <circle cx="20"  cy="60" r=".8"/> <circle cx="190" cy="80" r="1"/>
+          <circle cx="155" cy="130" r=".8"/><circle cx="10"  cy="120" r="1"/>
+        </g>
+
+        <!-- SATÉLITE en órbita -->
+        <g class="sat-orbit" id="satOrbit" style="transform-origin:120px 50px">
+          <!-- Cuerpo satélite -->
+          <rect x="108" y="44" width="24" height="12" rx="3" fill="#ccd8e8" filter="url(#satGlow)"/>
+          <!-- Paneles solares -->
+          <rect x="86"  y="47" width="22" height="6" rx="2" fill="#1a6bcc" opacity=".9"/>
+          <rect x="132" y="47" width="22" height="6" rx="2" fill="#1a6bcc" opacity=".9"/>
+          <!-- Antena -->
+          <line x1="120" y1="44" x2="120" y2="38" stroke="#aaa" stroke-width="1"/>
+          <circle cx="120" cy="37" r="2" fill="#ffd040" filter="url(#satGlow)"/>
+        </g>
+
+        <!-- Señal cohete→satélite -->
+        <line id="signalLine" x1="65" y1="70" x2="155" y2="45"
+              stroke="#00e5ff" stroke-width="1" opacity=".5"
+              class="signal-beam"/>
+
+        <!-- COHETE -->
+        <g class="rocket-body">
+          <!-- Fuego -->
+          <g class="rocket-fire">
+            <ellipse cx="60" cy="118" rx="7"  ry="12" fill="#ff6600" opacity=".9"/>
+            <ellipse cx="60" cy="118" rx="4"  ry="8"  fill="#ffd040"/>
+            <ellipse cx="60" cy="122" rx="3"  ry="5"  fill="#fff" opacity=".6"/>
+          </g>
+          <!-- Cuerpo cohete -->
+          <path d="M52,110 L52,75 Q60,58 68,75 L68,110 Z" fill="#d0dae8"/>
+          <!-- Nariz -->
+          <path d="M52,75 Q60,50 68,75 Z" fill="#cc0000"/>
+          <!-- Ventana -->
+          <circle cx="60" cy="88" r="7" fill="#0a1a3a" stroke="#00e5ff" stroke-width="1.5"/>
+          <circle cx="60" cy="88" r="4" fill="#001a3a"/>
+          <circle cx="57" cy="85" r="1.5" fill="#00e5ff" opacity=".8"/>
+          <!-- Aletas -->
+          <path d="M52,100 L42,112 L52,108 Z" fill="#aa0000"/>
+          <path d="M68,100 L78,112 L68,108 Z" fill="#aa0000"/>
+          <!-- Bandera Ecuador en cohete -->
+          <rect x="54" y="77" width="12" height="4" fill="#ffcc00"/>
+          <rect x="54" y="81" width="12" height="3" fill="#003893"/>
+          <rect x="54" y="84" width="12" height="3" fill="#cc0000"/>
+        </g>
+
+        <!-- Contador satélites visual -->
+        <g id="satDots" transform="translate(10, 15)">
+          <!-- se generan desde JS -->
+        </g>
+
+        <!-- Label señal -->
+        <text x="100" y="145" font-size="8" fill="#3a5080"
+              font-family="Orbitron" text-anchor="middle">SEÑAL ACTIVA</text>
+      </svg>
+    </div>
+
+    <div class="big-val" id="satVal">—<span class="u">SAT</span></div>
+    <div class="bar-t"><div class="bar-f" id="satBar" style="background:linear-gradient(90deg,#00ff88,#00e5ff)"></div></div>
+    <div class="sub-lbl" id="satStatus">Esperando señal…</div>
+  </div>
+
+  <!-- ══ 6 · FECHA Y HORA — ECUADOR ══ -->
+  <div class="card c-dt">
+    <div class="card-title">🇪🇨 Fecha y Hora Ecuador</div>
+
+    <div class="ecuador-wrap">
+
+      <!-- Bandera Ecuador SVG -->
+      <svg class="flag-svg" viewBox="0 0 180 100" xmlns="http://www.w3.org/2000/svg">
+        <!-- Franjas -->
+        <rect x="0" y="0"  width="180" height="50" fill="#ffcc00"/>
+        <rect x="0" y="50" width="180" height="25" fill="#003893"/>
+        <rect x="0" y="75" width="180" height="25" fill="#cc0000"/>
+        <!-- Escudo simplificado -->
+        <ellipse cx="90" cy="50" rx="22" ry="16" fill="#ffcc00" stroke="#003893" stroke-width="1.5"/>
+        <ellipse cx="90" cy="50" rx="16" ry="10" fill="#1a6bcc"/>
+        <!-- Cóndor estilizado -->
+        <path d="M90,40 Q95,35 102,38 Q95,42 90,40 Z" fill="#4a3010"/>
+        <path d="M90,40 Q85,35 78,38 Q85,42 90,40 Z"  fill="#4a3010"/>
+        <circle cx="90" cy="44" r="3" fill="#4a3010"/>
+        <!-- Sol rays -->
+        <g stroke="#ffcc00" stroke-width="1" opacity=".7">
+          <line x1="90" y1="34" x2="90" y2="30"/>
+          <line x1="96" y1="36" x2="99" y2="33" transform="rotate(30,90,50)"/>
+          <line x1="84" y1="36" x2="81" y2="33" transform="rotate(-30,90,50)"/>
+        </g>
+      </svg>
+
+      <!-- Reloj analógico con manecillas reales -->
+      <svg class="clock-ring" viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="clockFaceGrad" cx="50%" cy="50%" r="50%" gradientUnits="objectBoundingBox">
+            <stop offset="0%"  stop-color="#0c1630"/>
+            <stop offset="100%" stop-color="#060c1e"/>
+          </linearGradient>
+        </defs>
+        <!-- Franjas colores Ecuador en el borde -->
+        <circle cx="65" cy="65" r="62" fill="none" stroke="#ffcc00" stroke-width="6" stroke-dasharray="130 260" stroke-dashoffset="0"/>
+        <circle cx="65" cy="65" r="62" fill="none" stroke="#003893" stroke-width="6" stroke-dasharray="130 260" stroke-dashoffset="-130"/>
+        <circle cx="65" cy="65" r="62" fill="none" stroke="#cc0000" stroke-width="6" stroke-dasharray="130 260" stroke-dashoffset="-260"/>
+        <!-- Cara del reloj -->
+        <circle cx="65" cy="65" r="54" fill="#060c1e" stroke="#0a1428" stroke-width="1"/>
+        <!-- Marcas de hora -->
+        <g stroke="#1a3060" stroke-width="2">
+          <line x1="65" y1="14" x2="65" y2="22"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(30,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(60,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(90,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(120,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(150,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(180,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(210,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(240,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(270,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(300,65,65)"/>
+          <line x1="65" y1="14" x2="65" y2="22" transform="rotate(330,65,65)"/>
+        </g>
+        <!-- Manecilla hora -->
+        <line id="clockH" x1="65" y1="65" x2="65" y2="36"
+              stroke="#fff" stroke-width="3" stroke-linecap="round"
+              style="transform-origin:65px 65px; transform:rotate(0deg); transition:transform .5s ease;"/>
+        <!-- Manecilla minutos -->
+        <line id="clockM" x1="65" y1="65" x2="65" y2="24"
+              stroke="#00e5ff" stroke-width="2" stroke-linecap="round"
+              style="transform-origin:65px 65px; transform:rotate(0deg); transition:transform .5s ease;"/>
+        <!-- Manecilla segundos -->
+        <line id="clockS" x1="65" y1="70" x2="65" y2="18"
+              stroke="#ff3355" stroke-width="1" stroke-linecap="round"
+              style="transform-origin:65px 65px; transform:rotate(0deg); transition:transform .3s ease;"/>
+        <!-- Centro -->
+        <circle cx="65" cy="65" r="4" fill="#ff3355"/>
+        <circle cx="65" cy="65" r="2" fill="#fff"/>
+      </svg>
+
+      <!-- Fecha digital -->
+      <div style="text-align:center">
+        <div style="font-family:'Orbitron',monospace;font-size:20px;color:#fff;letter-spacing:2px;" id="fechaVal">--/--/----</div>
+        <div style="font-family:'Orbitron',monospace;font-size:28px;color:#ffd040;letter-spacing:3px;margin-top:4px;" id="horaVal">--:--:--</div>
+        <div class="sub-lbl" style="margin-top:6px">HORA ECUADOR (UTC-5)</div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /grid -->
+
+<!-- ══════════ BARRA TAGO ══════════ -->
+<div class="tago-bar">
+  <div><span class="pulse-dot"></span>TAGO.IO · GPS NEO-6M</div>
+  <div>ÚLTIMA ACT: <span class="tago-accent" id="lastTime">—</span></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="tagoStatus" style="color:var(--green)">● CONECTADO</span>
+    <button class="chg-btn" id="chgBtn">🔑 TOKEN</button>
+  </div>
+</div>
+</div><!-- /wrapper -->
+
+<script>
+/* ══════════════════════════════════════════
+   VARIABLES TAGO — deben coincidir
+   exactamente con tu código Arduino
+══════════════════════════════════════════ */
+const V_LAT  = "latitud";
+const V_LNG  = "longitud";
+const V_ALT  = "altitud";
+const V_SPD  = "velocidad";
+const V_SAT  = "satelites";
+const V_DATE = "fecha_ec";
+const V_TIME = "hora_ec";
+
+const INTERVAL = 3000; // ms — actualización cada 3 s
+
+/* ── DOM ── */
+const modalOverlay = document.getElementById("modalOverlay");
+const tokenInp     = document.getElementById("tokenInp");
+const eyeBtn       = document.getElementById("eyeBtn");
+const connBtn      = document.getElementById("connBtn");
+const modalErr     = document.getElementById("modalErr");
+const chgBtn       = document.getElementById("chgBtn");
+const lastTime     = document.getElementById("lastTime");
+const tagoStatus   = document.getElementById("tagoStatus");
+
+let TOKEN    = "";
+let pollTimer = null;
+
+/* ── Estrellas en canvas ── */
+(function initStars(){
+  const c  = document.getElementById("stars");
+  const ctx = c.getContext("2d");
+  c.width  = window.innerWidth;
+  c.height = window.innerHeight;
+  for(let i=0;i<200;i++){
+    const x = Math.random()*c.width;
+    const y = Math.random()*c.height;
+    const r = Math.random()*1.2+.2;
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle = `rgba(255,255,255,${Math.random()*.7+.1})`;
+    ctx.fill();
+  }
+})();
+
+/* ── Modal ── */
+eyeBtn.addEventListener("click", ()=>{
+  tokenInp.type = tokenInp.type==="password" ? "text" : "password";
+});
+tokenInp.addEventListener("keydown", e=>{ if(e.key==="Enter") connBtn.click(); });
+
+connBtn.addEventListener("click", async ()=>{
+  const t = tokenInp.value.trim();
+  if(!t){ modalErr.textContent="Ingresa el token."; return; }
+  modalErr.textContent="";
+  connBtn.textContent="Verificando…";
+  connBtn.disabled=true;
+  const ok = await testToken(t);
+  connBtn.textContent="CONECTAR";
+  connBtn.disabled=false;
+  if(ok){
+    TOKEN = t;
+    localStorage.setItem("gps_token", t);
+    modalOverlay.style.display="none";
+    startPolling();
+  } else {
+    modalErr.textContent="❌ Token inválido. Verifica en Tago.io.";
+  }
+});
+
+chgBtn.addEventListener("click", ()=>{
+  clearInterval(pollTimer);
+  tokenInp.value = TOKEN;
+  modalOverlay.style.display="flex";
+});
+
+async function testToken(t){
+  try{
+    const r = await fetch(`https://api.tago.io/data?variable=${V_LAT}&qty=1`,
+                          {headers:{"Device-Token":t}});
+    if(!r.ok) return false;
+    const j = await r.json();
+    return j.status === true;
+  }catch{ return false; }
+}
+
+/* ── Fetch variable Tago ── */
+async function fetchVar(v){
+  const r = await fetch(`https://api.tago.io/data?variable=${v}&qty=1`,
+                        {headers:{"Device-Token":TOKEN}});
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  const j = await r.json();
+  return (j.result && j.result.length) ? j.result[0].value : null;
+}
+
+/* ════════════════════════════
+   UPDATE UI
+════════════════════════════ */
+function updateUI(lat, lng, alt, spd, sat, dateStr, timeStr){
+  lastTime.textContent   = new Date().toLocaleTimeString("es-EC");
+  tagoStatus.textContent = "● CONECTADO";
+  tagoStatus.style.color = "var(--green)";
+
+  /* ── LATITUD (rango útil GPS -90 a +90) ── */
+  if(lat !== null){
+    const v = parseFloat(lat);
+    document.getElementById("latVal").innerHTML =
+      `${v.toFixed(4)}<span class="u">°</span>`;
+    // Barra 0-100% mapeado de -90 a +90
+    const pct = ((v + 90) / 180) * 100;
+    document.getElementById("latBar").style.width = pct + "%";
+    // Aguja globo: -90°=girado, 0°=centro, +90°=opuesto
+    const ang = (v / 90) * 80; // ±80° de rotación visual
+    document.getElementById("latNeedle").style.transform =
+      `translateX(-50%) rotate(${ang}deg)`;
+    document.getElementById("latStatus").textContent =
+      v > 0 ? `${v.toFixed(4)}° Norte` : v < 0 ? `${Math.abs(v).toFixed(4)}° Sur` : "Ecuador (0°)";
+  }
+
+  /* ── LONGITUD (-180 a +180) ── */
+  if(lng !== null){
+    const v = parseFloat(lng);
+    document.getElementById("lngVal").innerHTML =
+      `${v.toFixed(4)}<span class="u">°</span>`;
+    const pct = ((v + 180) / 360) * 100;
+    document.getElementById("lngBar").style.width = pct + "%";
+    // Punto en el anillo de Saturno
+    const angle = ((v + 180) / 360) * Math.PI * 2 - Math.PI/2;
+    const rx = 70, ry = 16, cx = 90, cy = 68;
+    const dx = cx + rx * Math.cos(angle);
+    const dy = cy + ry * Math.sin(angle);
+    const dot = document.getElementById("lngDot");
+    dot.setAttribute("cx", dx.toFixed(1));
+    dot.setAttribute("cy", dy.toFixed(1));
+    document.getElementById("lngStatus").textContent =
+      v >= 0 ? `${v.toFixed(4)}° Este` : `${Math.abs(v).toFixed(4)}° Oeste`;
+  }
+
+  /* ── ALTITUD (0–6000 m) ── */
+  if(alt !== null){
+    const v = parseFloat(alt);
+    document.getElementById("altVal").innerHTML =
+      `${Math.round(v).toLocaleString("es-EC")}<span class="u">m</span>`;
+    const pct = Math.min(100, Math.max(0, v / 6000 * 100));
+    // Barra vertical en el SVG (120 px de alto, de abajo hacia arriba)
+    const barH = (pct / 100) * 120;
+    const barY  = 140 - barH;
+    const bar = document.getElementById("altBarRect");
+    bar.setAttribute("height", barH);
+    bar.setAttribute("y", barY);
+    document.getElementById("altStatus").textContent =
+      v < 500  ? "Nivel bajo 🌊" :
+      v < 1500 ? "Valle 🌄"      :
+      v < 3000 ? "Montaña ⛰"    :
+      v < 5000 ? "Alta montaña 🏔" : "Cima 🗻";
+  }
+
+  /* ── VELOCIDAD (0–200 km/h) ── */
+  if(spd !== null){
+    const v = parseFloat(spd);
+    const vRound = Math.round(v * 10) / 10;
+    document.getElementById("spdVal").innerHTML =
+      `${vRound}<span class="u">km/h</span>`;
+    document.getElementById("spdCenterVal").textContent = Math.round(v);
+    // Arco: 211px de circunferencia total (semicírculo)
+    const pct = Math.min(100, v / 200 * 100);
+    const offset = 211 - (pct / 100) * 211;
+    document.getElementById("spdArc").style.strokeDashoffset = offset;
+    // Aguja: de -90° (0) a +90° (200)
+    const ang = -90 + (pct / 100) * 180;
+    document.getElementById("spdNeedle").style.transform = `rotate(${ang}deg)`;
+    document.getElementById("spdStatus").textContent =
+      v < 1   ? "Detenido 🛑" :
+      v < 30  ? "Lento 🐢"   :
+      v < 80  ? "Normal 🚗"  :
+      v < 140 ? "Rápido 💨"  : "¡Máxima velocidad! 🏎";
+  }
+
+  /* ── SATÉLITES (0–12) ── */
+  if(sat !== null){
+    const v = parseInt(sat);
+    document.getElementById("satVal").innerHTML =
+      `${v}<span class="u">SAT</span>`;
+    document.getElementById("satBar").style.width = Math.min(100, v / 12 * 100) + "%";
+    document.getElementById("satStatus").textContent =
+      v === 0 ? "Sin señal ❌" :
+      v < 4   ? "Señal débil ⚠️" :
+      v < 8   ? "Señal buena ✅" : "Señal excelente 🛰";
+    // Dibujar puntos satélite
+    const g = document.getElementById("satDots");
+    g.innerHTML = "";
+    for(let i=0;i<12;i++){
+      const active = i < v;
+      const cx = 15 + (i % 6) * 20;
+      const cy = Math.floor(i / 6) * 14;
+      const dot = document.createElementNS("http://www.w3.org/2000/svg","circle");
+      dot.setAttribute("cx", cx);
+      dot.setAttribute("cy", cy);
+      dot.setAttribute("r", "5");
+      dot.setAttribute("fill", active ? "#00ff88" : "#1a2a4a");
+      if(active){
+        dot.setAttribute("filter","url(#satGlow)");
+      }
+      g.appendChild(dot);
+    }
+  }
+
+  /* ── FECHA ── */
+  if(dateStr !== null){
+    document.getElementById("fechaVal").textContent = dateStr;
+  }
+
+  /* ── HORA + RELOJ ── */
+  if(timeStr !== null){
+    document.getElementById("horaVal").textContent = timeStr;
+    // Parsear hh:mm:ss
+    const parts = String(timeStr).split(":");
+    if(parts.length === 3){
+      const h = parseInt(parts[0]) % 12;
+      const m = parseInt(parts[1]);
+      const s = parseInt(parts[2]);
+      const angH = (h / 12) * 360 + (m / 60) * 30;
+      const angM = (m / 60) * 360 + (s / 60) * 6;
+      const angS = (s / 60) * 360;
+      document.getElementById("clockH").style.transform = `rotate(${angH}deg)`;
+      document.getElementById("clockM").style.transform = `rotate(${angM}deg)`;
+      document.getElementById("clockS").style.transform = `rotate(${angS}deg)`;
+    }
+  }
+}
+
+/* ── Poll Tago ── */
+async function poll(){
+  try{
+    const [lat, lng, alt, spd, sat, dateStr, timeStr] = await Promise.all([
+      fetchVar(V_LAT), fetchVar(V_LNG), fetchVar(V_ALT),
+      fetchVar(V_SPD), fetchVar(V_SAT), fetchVar(V_DATE), fetchVar(V_TIME)
+    ]);
+    updateUI(lat, lng, alt, spd, sat, dateStr, timeStr);
+  } catch(e){
+    tagoStatus.textContent = "● ERROR CONEXIÓN";
+    tagoStatus.style.color = "var(--red)";
+    console.error("Tago:", e);
+  }
+}
+
+function startPolling(){
+  poll();
+  pollTimer = setInterval(poll, INTERVAL);
+}
+
+/* ── Cargar token guardado ── */
+window.addEventListener("load", ()=>{
+  const saved = localStorage.getItem("gps_token");
+  if(saved) tokenInp.value = saved;
+});
+</script>
+</body>
+</html>
