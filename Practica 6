@@ -4,11 +4,11 @@
 #include <TinyGPSPlus.h>
 
 // ================= WIFI =================
-const char* ssid = "TU_WIFI";
-const char* password = "TU_PASSWORD";
+const char* ssid = "_HIRALDA_";
+const char* password = "**2004##25__";
 
 // ================= TAGO =================
-String token = "TU_TOKEN_TAGO";
+String token = "132d7a07-4c99-4130-aab5-974e71ae2582";
 
 // ================= GPS =================
 #define GPS_RX 16
